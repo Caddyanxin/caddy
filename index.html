@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caddy</title>
+<style>
+  :root{
+    --paper:#F7F4EC;
+    --surface:#FFFDF7;
+    --ink:#22261F;
+    --ink-2:#3E443A;
+    --muted:#7B7668;
+    --rule:#DDD5C1;
+    --rule-soft:#E8E1D0;
+    --ochre:#A8763E;
+    --sage:#6F7F63;
+    --serif:"Songti SC","Source Han Serif SC","Noto Serif SC","STSong","SimSun",serif;
+    --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(34,38,31,.045) .6px,transparent .6px);
+    background-size:8px 8px;
+    padding:0 0 60px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 34px}
+
+  /* ── 顶栏 ── */
+  .top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:30px 0 0;
+  }
+  .top .name{font-family:var(--serif);font-size:16px;letter-spacing:.22em}
+  .top .meta{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--muted)}
+
+  /* ── 头图区 ── */
+  .intro{padding:56px 0 0}
+  .intro h1{
+    font-family:var(--serif);font-weight:400;
+    font-size:30px;line-height:1.6;letter-spacing:.03em;
+    color:var(--ink);
+  }
+  .intro h1 .wx{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;
+    color:var(--muted);margin-left:16px;vertical-align:middle;
+  }
+  .lede-line{
+    margin-top:14px;
+    font-size:14.5px;line-height:1.95;color:var(--ink-2);
+    text-align:justify;
+  }
+  .tags{
+    margin-top:26px;display:flex;flex-wrap:wrap;gap:0;
+    border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  }
+  .tags span{
+    font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--muted);
+    padding:10px 18px 10px 0;margin-right:18px;border-right:1px solid var(--rule-soft);
+  }
+  .tags span:last-child{border-right:0;margin-right:0}
+
+  /* ── 卡片墙 ── */
+  .wall{
+    margin-top:34px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  }
+  .c{
+    text-align:left;cursor:pointer;font:inherit;color:inherit;
+    background:var(--surface);border:1px solid var(--rule);
+    padding:22px 22px 20px;min-height:172px;
+    display:flex;flex-direction:column;
+    transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease;
+  }
+  .c:hover{
+    border-color:var(--ochre);transform:translateY(-3px);
+    box-shadow:0 12px 26px -18px rgba(34,38,31,.45);
+  }
+  .c:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+  .c .tag{
+    font-family:var(--mono);font-size:9px;letter-spacing:.26em;
+    color:var(--ochre);text-transform:uppercase;
+  }
+  .c .t{
+    font-family:var(--serif);font-size:20px;line-height:1.55;
+    letter-spacing:.03em;margin-top:11px;
+  }
+  .c .d{
+    margin-top:auto;padding-top:14px;
+    font-size:12.5px;line-height:1.85;color:var(--muted);
+  }
+  .c.wide{grid-column:span 3;min-height:0;padding-bottom:26px}
+  .c.wide .t{font-size:26px;margin-top:10px}
+  .c .tw{
+    font-family:var(--mono);font-size:14px;letter-spacing:.12em;
+    color:#0B0D08;margin-left:12px;vertical-align:middle;
+  }
+  .years{
+    margin-top:20px;display:flex;flex-wrap:wrap;gap:0;
+    border-top:1px solid var(--rule-soft);
+  }
+  .years i{
+    font-style:normal;font-family:var(--mono);font-size:10px;
+    letter-spacing:.1em;color:var(--muted);
+    padding:11px 16px 0 0;margin-right:16px;
+    border-right:1px solid var(--rule-soft);
+  }
+  .years i:last-child{border-right:0}
+  .years i b{color:var(--ink);font-weight:400;margin-right:7px}
+
+  .hint{
+    margin-top:34px;text-align:center;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:var(--muted);
+  }
+
+  /* ── 阅读层 ── */
+  .reader{
+    position:fixed;inset:0;z-index:30;display:none;
+    background:rgba(34,38,31,.32);backdrop-filter:blur(3px);
+    padding:24px;
+  }
+  .reader.on{display:block}
+  .sheet{
+    position:relative;max-width:720px;margin:0 auto;
+    max-height:calc(100vh - 48px);overflow-y:auto;
+    background:var(--surface);border:1px solid var(--rule);
+    padding:44px 50px 48px;
+    box-shadow:0 40px 90px -40px rgba(34,38,31,.5);
+    animation:rise .28s cubic-bezier(.22,.7,.3,1) both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .sheet .x{
+    position:absolute;top:14px;right:16px;
+    border:0;background:transparent;cursor:pointer;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--muted);
+    padding:8px;
+  }
+  .sheet .x:hover{color:var(--ochre)}
+
+  .k{font-family:var(--mono);font-size:9px;letter-spacing:.3em;color:var(--ochre);text-transform:uppercase}
+  .h{font-family:var(--serif);font-weight:400;font-size:34px;line-height:1.5;letter-spacing:.03em;margin-top:10px}
+  .lede{margin-top:16px;font-size:15px;line-height:2;color:var(--ink)}
+
+  .list{margin-top:28px;border-top:1px solid var(--rule)}
+  .li{
+    display:grid;grid-template-columns:88px 1fr;gap:18px;
+    padding:13px 0;border-bottom:1px solid var(--rule-soft);
+  }
+  .li b{font-size:13px;font-weight:500;color:var(--ink);letter-spacing:.04em;padding-top:1px}
+  .li span{font-size:13px;line-height:1.95;color:var(--ink-2)}
+
+  .tl{margin-top:26px;border-top:1px solid var(--rule)}
+  .tl .r{
+    display:grid;grid-template-columns:100px 1fr;gap:18px;
+    padding:12px 0;border-bottom:1px solid var(--rule-soft);
+  }
+  .tl .y{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--muted);padding-top:3px}
+  .tl .cell b{font-size:13px;font-weight:500;color:var(--ink)}
+  .tl .cell span{display:block;margin-top:4px;font-size:12.5px;line-height:1.8;color:var(--muted)}
+  .tl .cell{cursor:pointer}
+  body.editing .tl .cell{cursor:text}
+  .note{
+    margin-top:12px;font-family:var(--sans);font-weight:500;
+    font-size:12.5px;line-height:1.7;color:var(--ink);
+  }
+  .co-t{
+    margin-top:8px;padding:0 0 2px;border:0;background:none;cursor:pointer;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+    color:var(--ochre);border-bottom:1px dotted rgba(168,118,62,.55);
+  }
+  .co-t:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .co-t::after{content:" +"}
+  .co-t.on::after{content:" −"}
+  .co{display:none;margin-top:10px;padding:11px 13px;
+    border-left:2px solid var(--rule-soft);background:rgba(35,42,38,.028)}
+  .co.on{display:block}
+  .co dl{margin:0}
+  .co dt{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted)}
+  .co dt+dd{margin:2px 0 9px;font-size:12.5px;line-height:1.85;color:var(--ink-2)}
+  .co dt:last-of-type+dd{margin-bottom:0}
+
+  .res{
+    margin-top:26px;padding:14px 16px;border-left:2px solid var(--ochre);
+    background:rgba(168,118,62,.05);
+    font-size:13px;line-height:1.95;color:var(--ink-2);
+  }
+  .res b{
+    display:block;font-family:var(--mono);font-weight:400;
+    font-size:8.5px;letter-spacing:.24em;color:var(--ochre);
+    text-transform:uppercase;margin-bottom:6px;
+  }
+  .ph{
+    color:var(--ochre);border-bottom:1px dashed var(--ochre);
+    padding:0 3px;
+  }
+
+  .rel{
+    margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;
+    font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted);
+  }
+  .rel button{
+    border:0;background:transparent;cursor:pointer;padding:0 0 2px;
+    font-family:var(--sans);font-size:12.5px;letter-spacing:.06em;color:var(--ink);
+    border-bottom:1px solid var(--rule);
+  }
+  .rel button:hover{color:var(--ochre);border-bottom-color:var(--ochre)}
+
+  /* ── 窄屏 ── */
+  @media (max-width:900px){
+    .wall{grid-template-columns:repeat(2,1fr)}
+    .c.wide{grid-column:span 2}
+    .intro h1{font-size:24px}
+  }
+  @media (max-width:620px){
+    .wrap{padding:0 20px}
+    .top{padding-top:22px}
+    .intro{padding-top:36px}
+    .intro h1{font-size:21px;line-height:1.95}
+    .wall{grid-template-columns:1fr;gap:12px}
+    .c.wide{grid-column:span 1}
+    .c{min-height:0}
+    .c .d{padding-top:12px}
+    .reader{padding:12px}
+    .sheet{max-height:calc(100vh - 24px);padding:38px 24px 36px}
+    .h{font-size:26px}
+    .li{grid-template-columns:78px 1fr;gap:12px}
+    .tl .r{grid-template-columns:80px 1fr;gap:12px}
+  }
+
+  /* ── 编辑 ── */
+  .ebar{position:fixed;right:18px;bottom:18px;display:flex;gap:8px;z-index:80}
+  .ebar button{
+    font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+    padding:9px 14px;border:1px solid var(--rule);background:var(--surface);
+    color:var(--ink-soft);cursor:pointer;border-radius:2px;
+  }
+  .ebar button:hover{border-color:var(--ochre);color:var(--ochre)}
+  .ebar button.on{background:var(--ochre);color:#fff;border-color:var(--ochre)}
+  body.editing [contenteditable="true"]{outline:1px dashed rgba(168,118,62,.45);outline-offset:4px;cursor:text}
+  body.editing [contenteditable="true"]:focus{outline:1px solid var(--ochre);background:rgba(168,118,62,.05)}
+  body.editing .wall .c{cursor:text}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <div class="name">Caddy</div>
+  </div>
+
+  <section class="intro">
+    <h1>电商项目经理<span class="wx">WeChat　Caddy1142</span></h1>
+    <p class="lede-line">负责品牌官方旗舰店整体经营，涵盖项目成本核算、货品规划、供应链协同、前端店铺经营与投放，从 0 搭建执行团队并组织协调落地。具备品牌方与服务方双背景，主导跨部门沟通与资源协调。</p>
+    <p class="lede-line">以成本、利润与投入产出为经营依据：单月 GMV 最高 5000 万，单场最高 600 万，累计投放消耗 2000 万+，单月增长最高 692%。</p>
+    <div class="tags">
+      <span>策略与商品</span><span>供应链与资源</span><span>内容与 AI 流程</span><span>团队与激励</span><span>数据与复盘</span><span>沟通协调</span><span>项目统筹</span><span>经营与投入产出</span>
+    </div>
+  </section>
+
+  <div class="wall">
+
+    <button class="c wide" data-go="0">
+      <span class="tag">路径</span>
+      <span class="t">2021 — 2026<span class="tw">（点击展开）</span></span>
+      <span class="d">服务方与品牌方双重背景，熟悉项目的完整周期。</span>
+      <div class="years">
+        <i><b>2021</b>严品传媒</i>
+        <i><b>22—24</b>热风官旗</i>
+        <i><b>2025</b>ONLY·绫致</i>
+        <i><b>2026</b>森林地带</i>
+        <i><b>Now</b>独立协作</i>
+      </div>
+    </button>
+
+    <button class="c" data-go="1">
+      <span class="tag">策略</span>
+      <span class="t">策略规划与商品判断</span>
+      <span class="d">负责经营目标拆解、货品结构规划与季度上新决策。</span>
+    </button>
+
+    <button class="c" data-go="2">
+      <span class="tag">供应链</span>
+      <span class="t">供应链与资源协同</span>
+      <span class="d">负责供应商评估、打样排产与品质管控，统筹定价与库存。</span>
+    </button>
+
+    <button class="c" data-go="3">
+      <span class="tag">内容</span>
+      <span class="t">内容生产与素材体系</span>
+      <span class="d">负责内容生产流程与素材资产管理，含 AI 辅助环节。</span>
+    </button>
+
+    <button class="c" data-go="4">
+      <span class="tag">团队</span>
+      <span class="t">团队搭建与激励</span>
+      <span class="d">负责执行团队搭建，覆盖岗位设计与激励方案。</span>
+    </button>
+
+    <button class="c" data-go="5">
+      <span class="tag">数据</span>
+      <span class="t">数据运营与复盘</span>
+      <span class="d">负责流量结构、用户结构与转化效率分析，并据此调整策略。</span>
+    </button>
+
+    <button class="c" data-go="6">
+      <span class="tag">沟通</span>
+      <span class="t">沟通协调与项目推进</span>
+      <span class="d">负责内外部沟通与节点推进，协调品牌方、供应链与平台。</span>
+    </button>
+
+    <button class="c" data-go="7">
+      <span class="tag">统筹</span>
+      <span class="t">项目统筹与体系搭建</span>
+      <span class="d">负责项目整体统筹与执行体系搭建，涵盖人、货、场、品、效。</span>
+    </button>
+
+    <button class="c" data-go="8">
+      <span class="tag">经营</span>
+      <span class="t">经营与投入产出</span>
+      <span class="d">负责成本、利润与投入产出核算，参与预算与定价决策。</span>
+    </button>
+
+    <button class="c" data-go="9">
+      <span class="tag">未完</span>
+      <span class="t">未完待续</span>
+      <span class="d">后续经历待补充。</span>
+    </button>
+
+  </div>
+
+  <div class="hint">点开看　·　ESC 合上</div>
+
+</div>
+
+<!-- ══ 阅读层 ══ -->
+<div class="reader" id="reader">
+  <div class="sheet">
+    <button class="x" id="close">CLOSE</button>
+    <div id="content"></div>
+  </div>
+</div>
+
+<!-- ══ 卡片内容 ══ -->
+<template id="e0">
+  <div class="k">路径</div>
+  <div class="h">2021 — 2026</div>
+  <p class="lede">具备品牌方与服务方双重背景，熟悉品牌侧的决策链路与目标口径，也清楚服务方在交付、协作与资源调度上的实际运作方式。</p>
+  <p class="note">各段可展开公司背景，含公司性质与业务构成。</p>
+  <div class="tl">
+    <div class="r"><div class="y">2021</div><div class="cell">
+      <b>严品传媒 · 星期六 / 千百度</b>
+      <span>负责星期六、千百度双品牌电商直播项目统筹。</span>
+      <button class="co-t" data-co>公司背景</button>
+      <div class="co">
+        <dl>
+          <dt>严品传媒</dt>
+          <dd>杭州头部直播电商服务商（DP），为品牌做代运营。业务含店铺代运营、直播间搭建、内容生产、投放代投，服务对象以鞋服品牌为主。</dd>
+          <dt>星期六</dt>
+          <dd>女鞋品牌，A 股上市。产品以时尚女鞋为主，单鞋、靴、凉鞋按季节铺，价格带偏大众。线下百货渠道起家，后主业转向直播电商，更名遥望科技。</dd>
+          <dt>千百度</dt>
+          <dd>女鞋品牌，港股上市。产品偏都市通勤与商务，皮鞋、靴类占大头，价格带中高。线下门店与电商并行。</dd>
+          <dt>我在这段</dt>
+          <dd>负责星期六、千百度双品牌电商直播项目的整体统筹：拆解销售与场次目标，编排直播排期，协调物料、场地与执行人员；前期完成人员储备与货品排期，并与品牌方对齐大促节点。</dd>
+        </dl>
+      </div>
+    </div></div>
+    <div class="r"><div class="y">2022—24</div><div class="cell">
+      <b>热风 Hotwind 官方旗舰店</b>
+      <span>负责官方旗舰店项目由代运营转向公司自营。</span>
+      <button class="co-t" data-co>公司背景</button>
+      <div class="co">
+        <dl>
+          <dt>热风 Hotwind</dt>
+          <dd>上海热风，快时尚服饰集合店。自有品牌、自有渠道，门店起家，品类覆盖鞋、服装、配饰，客群偏年轻大众。</dd>
+          <dt>项目背景</dt>
+          <dd>公司推进自营战略，将原先交由外部 DP 的官方旗舰店运营权限收回，转由内部团队承接。</dd>
+          <dt>我在这段</dt>
+          <dd>负责官方旗舰店自营运营，统筹货品、内容、投放与团队，并承担项目测算：广告费预算、大促投入、KOL 合作成本与预期产出，核算利润率与回收周期，据此排布投放与活动节奏。</dd>
+        </dl>
+      </div>
+    </div></div>
+    <div class="r"><div class="y">2025</div><div class="cell">
+      <b>ONLY · 绫致中国</b>
+      <span>负责品牌自营序列华南大区店铺运营。</span>
+      <button class="co-t" data-co>公司背景</button>
+      <div class="co">
+        <dl>
+          <dt>ONLY</dt>
+          <dd>丹麦 Bestseller 集团旗下女装品牌，中国运营主体为绫致时装。集团下还有 VERO MODA、JACK &amp; JONES 等，多品牌独立运营，共享供应链与中后台。</dd>
+          <dt>两条线</dt>
+          <dd>ONLY 的电商分两个体系：一部分旗舰店由 DP 承接，另一部分为品牌自营序列。本段岗位属自营序列。</dd>
+          <dt>华南大区</dt>
+          <dd>大区内部按店铺划分。线上店铺与线下零售门店并行，货品结构、活动节奏与库存需两侧对齐。</dd>
+          <dt>我在这段</dt>
+          <dd>负责华南大区线上店铺的运营统筹，推进跨部门节点落地；协调线上店铺与线下零售门店在货品、活动与库存上的对齐。</dd>
+        </dl>
+      </div>
+    </div></div>
+    <div class="r"><div class="y">2026</div><div class="cell">
+      <b>森林地带 官方旗舰店</b>
+      <span>负责品牌项目从立项规划到销售落地。</span>
+      <button class="co-t" data-co>公司背景</button>
+      <div class="co">
+        <dl>
+          <dt>福建九鹏生物科技</dt>
+          <dd>森林地带为其自有品牌，主营户外用品。品类跨度较大，驱蚊液、帐篷、冲锋衣等快消与耐用品并行。</dd>
+          <dt>立项与规划</dt>
+          <dd>项目立项阶段即介入，与市场部共同完成前期规划：品牌定位、目标人群、渠道与节奏。</dd>
+          <dt>市场调研</dt>
+          <dd>做市场调研与竞品比对，确定价格带、核心卖点与货盘结构，区分主推款与引流款。</dd>
+          <dt>产品与落地</dt>
+          <dd>参与产品定位与商品规划，再排内容与投放节奏，推动商品完成从规划到销售的落地。</dd>
+        </dl>
+      </div>
+    </div></div>
+    <div class="r"><div class="y">Now</div><div class="cell"><b>独立协作</b><span>未完待续。</span></div></div>
+  </div>
+  <div class="res"><b>结果</b>负责跨部门对接与协同推进、合作方沟通与关系维护、项目成本与投入产出测算，以及从方案制定到落地执行的全程跟进。</div>
+  <div class="rel">跳到<button data-go="1">策略</button><button data-go="8">经营</button></div>
+</template>
+
+<template id="e1">
+  <div class="k">策略</div>
+  <div class="h">策略规划与商品判断</div>
+  <p class="lede">负责季度与月度经营策略的制定与落地，涵盖目标拆解、人群与货品结构规划、成本测算及上新决策。</p>
+  <div class="list">
+    <div class="li"><b>目标拆解</b><span>将销售目标按品类、款式与场次逐级分解，明确各环节的承接指标与考核口径。</span></div>
+    <div class="li"><b>人群与场景</b><span>结合平台流量分发特征与目标人群的消费场景，确定主推品类与上新节奏。</span></div>
+    <div class="li"><b>货品结构</b><span>按引流款、主推款、利润款划分货盘，设定各类占比与上新周期，保证整体动销。</span></div>
+    <div class="li"><b>版型与面料</b><span>评估版型修改次数与开发成熟度，核对面料克重、手感与色牢度，确认量产可行性。</span></div>
+    <div class="li"><b>成本测算</b><span>拆解面料、辅料、工费、包装、退货率与平台扣点，测算各款最低可售价与毛利空间。</span></div>
+    <div class="li"><b>上新决策</b><span>依据测算结果出具上架或淘汰结论，明确决策分工与执行节点。</span></div>
+  </div>
+  <div class="res"><b>结果</b>负责季度上新与货品结构调整的决策，判断结果直接影响当季库存与资金占用。</div>
+  <div class="rel">跳到<button data-go="2">供应链</button><button data-go="3">内容</button></div>
+</template>
+
+<template id="e2">
+  <div class="k">供应链</div>
+  <div class="h">供应链与资源协同</div>
+  <p class="lede">负责供应链端的成本、品质与交期管理，统筹工厂、仓配与平台资源的协同。</p>
+  <div class="list">
+    <div class="li"><b>工厂评估</b><span>从版型开发能力、面料适配性与生产端决策效率三个维度评估供应商，确认合作范围。</span></div>
+    <div class="li"><b>打样与排产</b><span>按首样、改样、确认样三阶段推进，节点留档并签字确认；快反订单按可控周期排产，交期在计划阶段锁定。</span></div>
+    <div class="li"><b>品质管控</b><span>以工厂自检为第一道，到货抽检为第二道，品质要求以可执行的检验清单形式下发至生产端。</span></div>
+    <div class="li"><b>定价与库存</b><span>结合成本、渠道价、活动价与周转天数测算定价，先确定价格体系，再核定铺货量与补单节奏。</span></div>
+    <div class="li"><b>资源排期</b><span>品牌方、工厂、仓配与平台资源位按月排期，重点核对到货时间与备货量。</span></div>
+  </div>
+  <div class="res"><b>结果</b>品质标准以检验清单形式落地至工厂，问题在出厂前处理，降低售后与退货成本。</div>
+  <div class="rel">跳到<button data-go="1">策略</button><button data-go="6">沟通</button></div>
+</template>
+
+<template id="e3">
+  <div class="k">内容</div>
+  <div class="h">内容生产与素材体系</div>
+  <p class="lede">负责内容生产的流程搭建与素材资产管理，涵盖选题规划、脚本结构、视觉标准与成效复盘。</p>
+  <div class="list">
+    <div class="li"><b>选题规划</b><span>依据货品上新节奏与搜索需求制定周度选题，覆盖新品介绍、使用场景、搭配方案与常见问题。</span></div>
+    <div class="li"><b>脚本结构</b><span>单条内容按信息点、卖点论证与行动引导三段控制，长度依据投放位置与人群调整。</span></div>
+    <div class="li"><b>视觉标准</b><span>统一画面构图、陈列方式与色调，形成可复用的拍摄规范，保证不同执行人产出的一致性。</span></div>
+    <div class="li"><b>素材管理</b><span>按品类、场景与卖点建立标签体系，支持内容与投放侧快速调用。</span></div>
+    <div class="li"><b>AI 辅助流程</b><span>将选题、脚本、话术与复盘四个环节接入 AI 工具，形成标准化 SOP，缩短内容产出周期。</span></div>
+    <div class="li"><b>成效复盘</b><span>以完播率、点击率与转化为评估维度，复盘结论回流至选题与脚本环节。</span></div>
+  </div>
+  <div class="res"><b>结果</b>内容流程与素材体系形成文档沉淀，可由团队按标准承接执行。</div>
+  <div class="rel">跳到<button data-go="4">团队</button><button data-go="1">策略</button></div>
+</template>
+
+<template id="e4">
+  <div class="k">团队</div>
+  <div class="h">团队搭建与激励</div>
+  <p class="lede">负责执行团队的搭建与管理，覆盖岗位设置、目标管理、授权机制与激励方案。</p>
+  <div class="list">
+    <div class="li"><b>岗位与编制</b><span>先明确岗位职责、协作关系与验收标准，再启动招聘；选人侧重判断力与责任意识。</span></div>
+    <div class="li"><b>目标管理</b><span>将月度目标分解至个人，明确各岗位对整体经营的贡献口径，按周期核对进度。</span></div>
+    <div class="li"><b>授权机制</b><span>统一标准与验收口径，过程由岗位负责人自主决策，结果由项目负责人承担。</span></div>
+    <div class="li"><b>激励方案</b><span>按岗位属性分别设计底薪、提成与奖金结构，使收入与产出挂钩。</span></div>
+    <div class="li"><b>人才梯队</b><span>关键岗位设置备份人选，交接形成文档，保障人员变动期间的业务连续性。</span></div>
+  </div>
+  <div class="res"><b>结果</b>从 0 搭建执行团队，覆盖选品、内容、投放与客服等职能，核心岗位可独立承担结果。</div>
+  <div class="rel">跳到<button data-go="3">内容</button><button data-go="9">未完</button></div>
+</template>
+
+<template id="e5">
+  <div class="k">数据</div>
+  <div class="h">数据运营与复盘</div>
+  <p class="lede">负责流量结构、用户结构与转化效率的分析，并据此调整货品结构与投放策略。</p>
+  <div class="list">
+    <div class="li"><b>流量结构</b><span>区分付费、自然与商品卡流量的占比，评估结构变化对投入产出的影响。</span></div>
+    <div class="li"><b>用户结构</b><span>比对曝光人群与实际购买人群的重合度，判断偏差来源在内容侧还是货品侧。</span></div>
+    <div class="li"><b>转化指标</b><span>以曝光、停留、转化率、UV 价值与 ROI 为核心指标逐场核对，避免单一指标误判。</span></div>
+    <div class="li"><b>保本测算</b><span>先测算保本 ROI 与单位获客成本，未达测算标准不放大投放规模。</span></div>
+    <div class="li"><b>复盘机制</b><span>复盘结论落至货品结构与投放预算的调整项，明确分工与执行时点。</span></div>
+  </div>
+  <div class="res"><b>结果</b>投放由内部团队直接执行，累计消耗 2000 万以上。</div>
+  <div class="rel">跳到<button data-go="1">策略</button><button data-go="3">内容</button></div>
+</template>
+
+<template id="e6">
+  <div class="k">沟通</div>
+  <div class="h">沟通协调与项目推进</div>
+  <p class="lede">负责项目内外部沟通与节点推进，覆盖品牌方、供应链、平台与内部各职能。</p>
+  <div class="list">
+    <div class="li"><b>品牌方对接</b><span>明确品牌方的经营目标与考核口径，同步项目进度、风险与需协调事项。</span></div>
+    <div class="li"><b>供应链协同</b><span>选品、定价、库存与活动资源提前对齐，规避缺货、超卖与到货延期。</span></div>
+    <div class="li"><b>平台对接</b><span>活动节奏、资源位与规则变动提前一周确认，预留调整与准备周期。</span></div>
+    <div class="li"><b>跨部门推进</b><span>协调各职能的资源与排期，把项目所需支持落到具体环节，减少信息重复传递与反复返工。</span></div>
+    <div class="li"><b>节点管理</b><span>关键节点设置预警机制，出现偏差及时暴露，并同步给出处理方案与补救时点。</span></div>
+  </div>
+  <div class="res"><b>结果</b>在 ONLY · 绫致中国项目协同中推进跨部门节点落地，协调线上店铺与线下零售在货品、活动与库存上的对齐。</div>
+  <div class="rel">跳到<button data-go="0">路径</button><button data-go="4">团队</button></div>
+</template>
+
+<template id="e7">
+  <div class="k">统筹</div>
+  <div class="h">项目统筹与体系搭建</div>
+  <p class="lede">负责项目从立项到落地的整体统筹，以及内部执行体系的搭建与沉淀。</p>
+  <div class="list">
+    <div class="li"><b>全盘统筹</b><span>将人、货、场、品、效五个模块纳入同一份年度计划，明确各模块的节点与职能分工。</span></div>
+    <div class="li"><b>体系搭建</b><span>排品、内容、复盘与交接流程形成模板与文档，降低人员更替带来的执行损耗。</span></div>
+    <div class="li"><b>项目落地</b><span>按人群定位、货盘结构、内容与投放节奏、数据复盘的顺序推进新项目落地。</span></div>
+    <div class="li"><b>现场管理</b><span>负责现场节奏与转化逻辑的把控，突发问题在现场完成决策与协调。</span></div>
+    <div class="li"><b>进度管理</b><span>目标按周核对，偏差在当周修正，不以周期末的集中冲刺替代过程管理。</span></div>
+  </div>
+  <div class="res"><b>结果</b>森林地带项目自立项阶段介入，完成前期规划、市场调研与商品落地。</div>
+  <div class="rel">跳到<button data-go="0">路径</button><button data-go="6">沟通</button></div>
+</template>
+
+<template id="e8">
+  <div class="k">经营</div>
+  <div class="h">经营与投入产出</div>
+  <p class="lede">负责项目成本、利润与投入产出的核算与控制，并参与经营决策。</p>
+  <div class="list">
+    <div class="li"><b>成本结构</b><span>梳理货品、履约、投放与人力四项成本的占比，明确可优化的环节与空间。</span></div>
+    <div class="li"><b>利润管理</b><span>毛利与净利分别核算，避免以毛利率替代实际盈利水平。</span></div>
+    <div class="li"><b>投入产出</b><span>投放按单品核算回收周期并纳入预算管理，未达回收预期的项目不予追加。</span></div>
+    <div class="li"><b>规模复制</b><span>单店模型跑通后再推进复制，控制人员与预算的扩张速度。</span></div>
+    <div class="li"><b>经营决策</b><span>预算、定价与排品具备决策权限，并对相应经营结果承担责任。</span></div>
+  </div>
+  <div class="res"><b>结果</b>单月 GMV 最高 5000 万，单场最高 600 万；投放累计消耗 2000 万以上。</div>
+  <div class="rel">跳到<button data-go="5">数据</button><button data-go="2">供应链</button></div>
+</template>
+
+<template id="e9">
+  <div class="k">未完</div>
+  <div class="h">未完待续</div>
+  <p class="lede">这一页先空着。有新的，再往里添。</p>
+  <div class="rel">跳到<button data-go="0">路径</button><button data-go="1">策略</button></div>
+</template>
+
+<script>
+(function(){
+  var reader  = document.getElementById('reader');
+  var content = document.getElementById('content');
+
+  function open(i){
+    var tpl = document.getElementById('e' + i);
+    if(!tpl) return;
+    content.innerHTML = '';
+    content.appendChild(tpl.content.cloneNode(true));
+    reader.classList.add('on');
+    reader.querySelector('.sheet').scrollTop = 0;
+  }
+
+  window.caddyOpen = open;
+
+  function close(){
+    reader.classList.remove('on');
+  }
+
+  document.addEventListener('click', function(e){
+    var go = e.target.closest('[data-go]');
+    if(go){ open(go.getAttribute('data-go')); return; }
+    var co = e.target.closest('[data-co]');
+    if(co){
+      co.classList.toggle('on');
+      var box = co.parentNode.querySelector('.co');
+      if(box) box.classList.toggle('on');
+      return;
+    }
+    var cell = e.target.closest('.tl .cell');
+    if(cell && !e.target.closest('.co') && !document.body.classList.contains('editing')){
+      var t = cell.querySelector('.co-t'), b = cell.querySelector('.co');
+      if(t && b){ t.classList.toggle('on'); b.classList.toggle('on'); return; }
+    }
+    if(e.target === reader || e.target.id === 'close') close();
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') close();
+  });
+})();
+</script>
+
+<div class="ebar">
+  <button id="edToggle">编辑</button>
+  <button id="edSave">下载副本</button>
+</div>
+
+<script>
+(function(){
+  var body = document.body;
+
+  // 按钮换成 div，文字才能直接改
+  document.querySelectorAll('.wall button.c').forEach(function(b){
+    var d = document.createElement('div');
+    for(var i=0;i<b.attributes.length;i++){
+      var a = b.attributes[i];
+      if(a.name !== 'class') d.setAttribute(a.name, a.value);
+    }
+    d.className = b.className;
+    d.setAttribute('role','button');
+    d.setAttribute('tabindex','0');
+    d.innerHTML = b.innerHTML;
+    b.parentNode.replaceChild(d, b);
+  });
+
+  var editing = false;
+
+  function hosts(){
+    return document.querySelectorAll('.name, .intro, .wall .c .tag, .wall .c .t, .wall .c .d, .wall .c .years, #content');
+  }
+
+  function setEd(v){
+    editing = v;
+    body.classList.toggle('editing', v);
+    hosts().forEach(function(el){
+      if(v) el.setAttribute('contenteditable','true');
+      else el.removeAttribute('contenteditable');
+    });
+    var t = document.getElementById('edToggle');
+    t.textContent = v ? '编辑中' : '编辑';
+    t.classList.toggle('on', v);
+  }
+
+  document.getElementById('edToggle').addEventListener('click', function(e){
+    e.stopPropagation();
+    setEd(!editing);
+  });
+
+  // 编辑时单击只落光标，双击才打开卡片
+  document.addEventListener('click', function(e){
+    if(!editing) return;
+    if(e.target.closest('.ebar')) return;
+    if(e.target.closest('.co-t')) return;
+    var reading = document.getElementById('reader').classList.contains('on');
+    if(!reading && e.target.closest('.wall .c')){ e.stopPropagation(); }
+    if(reading && e.target.closest('#content [data-go]')){ e.stopPropagation(); }
+  }, true);
+
+  document.addEventListener('dblclick', function(e){
+    if(!editing) return;
+    var c = e.target.closest('.wall .c');
+    if(c && c.getAttribute('data-go') !== null) window.caddyOpen(parseInt(c.getAttribute('data-go'),10));
+  });
+
+  document.getElementById('edSave').addEventListener('click', function(){
+    var clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); });
+    var w = clone.querySelector('body'); if(w) w.classList.remove('editing');
+    var t = clone.querySelector('#edToggle'); if(t){ t.textContent='编辑'; t.classList.remove('on'); }
+    var r = clone.querySelector('#reader'); if(r) r.classList.remove('on');
+    var cn = clone.querySelector('#content'); if(cn) cn.innerHTML = '';
+    clone.querySelectorAll('.co.on, .co-t.on').forEach(function(el){ el.classList.remove('on'); });
+    var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+    var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Caddy.html';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+  });
+})();
+</script>
+
+</body>
+</html>
